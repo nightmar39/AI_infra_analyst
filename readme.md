@@ -44,6 +44,26 @@ Administration -> Users and Access -> Service account
 Copy the API key and update the mcp-config.json with the value
 
 ### Setup MCP servers 
+
+```
+#TEST MCP Servers Locally 
+docker pull mcp/grafana
+docker pull mcp/postgres
+
+docker run --rm -i \
+  --network monitoring \
+  -e GRAFANA_URL=http://localhost:3000 \
+  -e GRAFANA_API_KEY=*GRAFANA_API_KEY* \
+  mcp/grafana \
+  -t stdio 
+
+docker run --rm -i \
+  --network monitoring \
+  -e POSTGRES_URL="postgresql://grafana:password@host.docker.internal:5432/cloudquery" \
+  mcp/postgres \
+  $POSTGRES_URL
+```
+
 On your local AI agent, configure the mcp servers using `mcp-config.json`. 
 
 In Claude you can set this up under 
