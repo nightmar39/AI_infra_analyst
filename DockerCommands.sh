@@ -31,7 +31,7 @@ docker run --rm -i \
 
 docker run --rm -i \
   --network monitoring \
-  -e POSTGRES_URL="<POSTGRES_URL>" \
+  -e POSTGRES_URL="postgresql://grafana:password@host.docker.internal:5432/cloudquery" \
   mcp/postgres \
   $POSTGRES_URL
 
