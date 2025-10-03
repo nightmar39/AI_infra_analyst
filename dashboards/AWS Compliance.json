@@ -1,0 +1,846 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 18,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "✅ Compliant"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 1,
+                "result": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "🚨 Issues Found"
+                },
+                "to": 1000
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Critical Compliance Issues Overview\nSELECT \n  'Unencrypted RDS' as metric,\n  COUNT(*) as value\nFROM aws_rds_instances \nWHERE storage_encrypted = false \n  AND db_instance_status = 'available'\n\nUNION ALL\n\nSELECT \n  'Public S3 Buckets' as metric,\n  COUNT(*) as value\nFROM aws_s3_buckets b\nLEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn\nWHERE pab.public_access_block_configuration IS NULL\n\nUNION ALL\n\nSELECT \n  'Open SSH Rules' as metric,\n  COUNT(*) as value\nFROM aws_ec2_security_groups sg\nWHERE EXISTS (\n  SELECT 1 \n  FROM jsonb_array_elements(sg.ip_permissions) AS rule\n  WHERE (rule->>'FromPort')::int <= 22 \n    AND (rule->>'ToPort')::int >= 22\n    AND EXISTS (\n      SELECT 1 \n      FROM jsonb_array_elements(rule->'IpRanges') AS ip_range\n      WHERE ip_range->>'CidrIp' = '0.0.0.0/0'\n    )\n)\n\nUNION ALL\n\nSELECT \n  'Public RDS' as metric,\n  COUNT(*) as value\nFROM aws_rds_instances\nWHERE publicly_accessible = true \n  AND db_instance_status = 'available'\n\nUNION ALL\n\nSELECT \n  'Unencrypted EBS' as metric,\n  COUNT(*) as value\nFROM aws_ec2_ebs_volumes \nWHERE encrypted = false \n  AND state != 'deleting'",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "🚨 Critical Security Issues",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 2,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Compliance Score by Account\nSELECT \n  account_id,\n  ROUND(\n    100.0 * (1.0 - \n      (COALESCE((SELECT COUNT(*) FROM aws_rds_instances WHERE storage_encrypted = false AND account_id = main.account_id AND db_instance_status = 'available'), 0) +\n       COALESCE((SELECT COUNT(*) FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn \n                WHERE pab.public_access_block_configuration IS NULL AND b.account_id = main.account_id), 0) +\n       COALESCE((SELECT COUNT(*) FROM aws_rds_instances WHERE publicly_accessible = true AND account_id = main.account_id AND db_instance_status = 'available'), 0)\n      ) / GREATEST(\n        COALESCE((SELECT COUNT(*) FROM aws_rds_instances WHERE account_id = main.account_id AND db_instance_status = 'available'), 0) +\n        COALESCE((SELECT COUNT(*) FROM aws_s3_buckets WHERE account_id = main.account_id), 0) +\n        1.0, 1.0)\n    ), 2\n  ) as compliance_score\nFROM (SELECT DISTINCT account_id FROM aws_rds_instances \n      UNION SELECT DISTINCT account_id FROM aws_s3_buckets \n      UNION SELECT DISTINCT account_id FROM aws_ec2_ebs_volumes) main\nORDER BY compliance_score ASC",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "📊 Compliance Score by Account",
+      "transparent": true,
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 3,
+      "options": {
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "right",
+          "showLegend": false,
+          "values": []
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- RDS Encryption Status\nSELECT \n  CASE \n    WHEN storage_encrypted = true THEN 'Encrypted'\n    ELSE 'Unencrypted'\n  END as encryption_status,\n  COUNT(*) as count\nFROM aws_rds_instances \nWHERE db_instance_status = 'available'\nGROUP BY storage_encrypted",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "🔐 RDS Encryption Status",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "COMPLIANT": {
+                  "color": "green",
+                  "index": 2
+                },
+                "CRITICAL": {
+                  "color": "red",
+                  "index": 0
+                },
+                "HIGH": {
+                  "color": "orange",
+                  "index": 1
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Unencrypted RDS Instances Detail\nSELECT \n  db_instance_identifier,\n  engine,\n  engine_version,\n  account_id,\n  region,\n  storage_encrypted,\n  publicly_accessible,\n  backup_retention_period,\n  CASE \n    WHEN storage_encrypted = false AND publicly_accessible = true THEN 'CRITICAL'\n    WHEN storage_encrypted = false THEN 'HIGH'\n    ELSE 'COMPLIANT'\n  END as risk_level,\n  instance_create_time\nFROM aws_rds_instances \nWHERE storage_encrypted = false \n  AND db_instance_status = 'available'\nORDER BY risk_level, account_id",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "🚨 Unencrypted RDS Instances",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "ACLS_ALLOWED": {
+                  "color": "orange",
+                  "index": 1
+                },
+                "FULLY_PUBLIC": {
+                  "color": "red",
+                  "index": 0
+                },
+                "PUBLIC_POLICY_ALLOWED": {
+                  "color": "orange",
+                  "index": 2
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Public S3 Buckets Detail\nSELECT \n  b.name as bucket_name,\n  b.account_id,\n  b.region,\n  CASE \n    WHEN pab.public_access_block_configuration IS NULL THEN 'FULLY_PUBLIC'\n    WHEN (pab.public_access_block_configuration->>'BlockPublicAcls')::boolean = false THEN 'ACLS_ALLOWED'\n    WHEN (pab.public_access_block_configuration->>'BlockPublicPolicy')::boolean = false THEN 'PUBLIC_POLICY_ALLOWED'\n    ELSE 'PROTECTED'\n  END as public_access_status,\n  COALESCE(b.tags->>'Name', b.name) as display_name,\n  COALESCE(b.tags->>'Environment', 'Unknown') as environment,\n  b.creation_date\nFROM aws_s3_buckets b\nLEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn\nWHERE pab.public_access_block_configuration IS NULL\n   OR (pab.public_access_block_configuration->>'BlockPublicAcls')::boolean = false\n   OR (pab.public_access_block_configuration->>'BlockPublicPolicy')::boolean = false\nORDER BY public_access_status, b.account_id, b.name",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "🌐 Public S3 Buckets",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "CRITICAL": {
+                  "color": "red",
+                  "index": 0
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Open SSH Security Groups\nSELECT \n  sg.group_id,\n  sg.group_name,\n  sg.account_id,\n  sg.region,\n  sg.vpc_id,\n  'SSH (22) from 0.0.0.0/0' as violation_type,\n  'CRITICAL' as severity\nFROM aws_ec2_security_groups sg\nWHERE EXISTS (\n  SELECT 1 \n  FROM jsonb_array_elements(sg.ip_permissions) AS rule\n  WHERE (rule->>'FromPort')::int <= 22 \n    AND (rule->>'ToPort')::int >= 22\n    AND EXISTS (\n      SELECT 1 \n      FROM jsonb_array_elements(rule->'IpRanges') AS ip_range\n      WHERE ip_range->>'CidrIp' = '0.0.0.0/0'\n    )\n)\nORDER BY sg.account_id, sg.group_name",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "🔐 Security Groups with Open SSH",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "INACTIVE_90_DAYS": {
+                  "color": "orange",
+                  "index": 2
+                },
+                "NEEDS_IMPROVEMENT": {
+                  "color": "yellow",
+                  "index": 1
+                },
+                "NEVER_USED": {
+                  "color": "red",
+                  "index": 3
+                },
+                "NON_COMPLIANT": {
+                  "color": "red",
+                  "index": 0
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- IAM Users with Console Access but No MFA\nSELECT \n  u.user_name,\n  u.account_id,\n  cr.password_last_used,\n  u.create_date,\n  cr.mfa_active,\n  CASE \n    WHEN cr.mfa_active = false AND cr.password_last_used IS NOT NULL THEN 'NON_COMPLIANT'\n    WHEN cr.mfa_active = true THEN 'COMPLIANT'\n    ELSE 'NO_CONSOLE_ACCESS'\n  END as mfa_compliance\nFROM aws_iam_users u\nLEFT JOIN aws_iam_credential_reports cr ON u.user_name = cr.\"user\"\nWHERE cr.mfa_active = false \n  AND cr.password_last_used IS NOT NULL\nORDER BY u.account_id, cr.password_last_used DESC",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "👤 IAM Users without MFA",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "NEEDS_IMPROVEMENT": {
+                  "color": "yellow",
+                  "index": 1
+                },
+                "NON_COMPLIANT": {
+                  "color": "red",
+                  "index": 0
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-datasource"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- RDS Backup Compliance\nSELECT \n  db_instance_identifier,\n  engine,\n  account_id,\n  region,\n  backup_retention_period,\n  preferred_backup_window,\n  storage_encrypted,\n  CASE \n    WHEN backup_retention_period = 0 THEN 'NON_COMPLIANT'\n    WHEN backup_retention_period < 7 THEN 'NEEDS_IMPROVEMENT'\n    ELSE 'COMPLIANT'\n  END as backup_compliance,\n  instance_create_time\nFROM aws_rds_instances\nWHERE db_instance_status = 'available'\n  AND backup_retention_period < 7\nORDER BY backup_compliance, account_id, db_instance_identifier",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "💾 RDS Backup Compliance Issues",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [
+    "AWS",
+    "Compliance"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "AWS Compliance",
+  "uid": "cfaad5cf-3c39-409c-a1ba-3ca7ed91dff3",
+  "version": 7
+}

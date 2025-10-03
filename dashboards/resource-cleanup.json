@@ -1,0 +1,613 @@
+{
+    "id": null,
+    "title": "Resource Lifecycle & Cleanup Dashboard",
+    "tags": ["cleanup", "cost-optimization", "waste", "lifecycle"],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "hideControls": false,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-90d",
+      "to": "now"
+    },
+    "timepicker": {
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d", "90d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "region",
+          "type": "query",
+          "query": "SELECT DISTINCT region FROM aws_ec2_instances ORDER BY region",
+          "datasource": "CloudInventoryDB",
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          }
+        },
+        {
+          "name": "account",
+          "type": "query",
+          "query": "SELECT DISTINCT account_id FROM aws_ec2_instances ORDER BY account_id",
+          "datasource": "CloudInventoryDB",
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "💰 Total Monthly Waste Identified",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            },
+            "unit": "currencyUSD"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT SUM(monthly_waste) as total_waste FROM ( SELECT COUNT(*) * 3.65 as monthly_waste FROM aws_ec2_eips WHERE instance_id IS NULL AND network_interface_id IS NULL AND region IN ($region) UNION ALL SELECT SUM(size) * 0.10 as monthly_waste FROM aws_ec2_ebs_volumes WHERE state = 'available' AND region IN ($region) UNION ALL SELECT COUNT(*) * 50 as monthly_waste FROM aws_ec2_instances WHERE state->>'Name' = 'stopped' AND region IN ($region) UNION ALL SELECT SUM(volume_size) * 0.05 * (EXTRACT(DAY FROM NOW() - start_time) / 30.0) as monthly_waste FROM aws_ec2_ebs_snapshots WHERE owner_id NOT LIKE '123456789012' AND start_time < NOW() - INTERVAL '90 days' AND region IN ($region) ) waste_sources",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "🗑️ Orphaned EBS Volumes",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT COUNT(*) as orphaned_volumes FROM aws_ec2_ebs_volumes WHERE state = 'available' AND region IN ($region) AND account_id IN ($account)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "🌐 Unused Elastic IPs",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 2},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT COUNT(*) as unused_eips FROM aws_ec2_eips WHERE instance_id IS NULL AND network_interface_id IS NULL AND region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "📸 Old Snapshots (>90 days)",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT COUNT(*) as old_snapshots FROM aws_ec2_ebs_snapshots WHERE start_time < NOW() - INTERVAL '90 days' AND owner_id NOT LIKE '123456789012' AND region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "💾 Orphaned EBS Volumes - Cleanup Candidates",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 30},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "monthly_cost_usd"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currencyUSD"
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "age_days"},
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "thresholds"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": true,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT volume_id, size, volume_type, region, create_time, EXTRACT(DAY FROM NOW() - create_time) as age_days, COALESCE(tags->>'Name', volume_id) as volume_name, COALESCE(tags->>'Environment', 'Unknown') as environment, size * 0.10 as monthly_cost_usd, CASE WHEN EXTRACT(DAY FROM NOW() - create_time) > 90 THEN 'Delete Immediately' WHEN EXTRACT(DAY FROM NOW() - create_time) > 30 THEN 'Review for Deletion' ELSE 'Recently Created' END as recommendation FROM aws_ec2_ebs_volumes WHERE state = 'available' AND region IN ($region) AND account_id IN ($account) ORDER BY age_days DESC, size DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "💸 Unused Elastic IPs - Monthly Cost Impact",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "monthly_cost_usd"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currencyUSD"
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "usage_status"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"Unused (Billable)": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"In Use": {"color": "green", "index": 1}}, "type": "value"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": true,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT public_ip, allocation_id, region, domain, CASE WHEN instance_id IS NULL AND network_interface_id IS NULL THEN 'Unused (Billable)' ELSE 'In Use' END as usage_status, CASE WHEN instance_id IS NULL AND network_interface_id IS NULL THEN 3.65 ELSE 0.00 END as monthly_cost_usd, CASE WHEN instance_id IS NULL AND network_interface_id IS NULL THEN 'Release Immediately' ELSE 'Keep' END as recommendation FROM aws_ec2_eips WHERE region IN ($region) ORDER BY usage_status DESC, public_ip",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "⏳ EC2 Instance Age Distribution",
+        "type": "histogram",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "bucketSize": 30,
+          "bucketOffset": 0,
+          "legend": {
+            "displayMode": "visible",
+            "placement": "bottom"
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT EXTRACT(DAY FROM NOW() - launch_time) as age_days, instance_type, state->>'Name' as state FROM aws_ec2_instances WHERE region IN ($region) AND account_id IN ($account) ORDER BY age_days DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "🗂️ Old Snapshots - Retention Analysis",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 90},
+                {"color": "red", "value": 180}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "estimated_storage_cost_usd"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currencyUSD"
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "age_days"},
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "thresholds"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": true,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT snapshot_id, volume_id, volume_size, region, start_time, description, EXTRACT(DAY FROM NOW() - start_time) as age_days, ROUND(volume_size * 0.05 * (EXTRACT(DAY FROM NOW() - start_time) / 30.0), 2) as estimated_storage_cost_usd, CASE WHEN EXTRACT(DAY FROM NOW() - start_time) > 180 THEN 'Delete Immediately' WHEN EXTRACT(DAY FROM NOW() - start_time) > 90 THEN 'Review for Deletion' ELSE 'Keep' END as retention_recommendation FROM aws_ec2_ebs_snapshots WHERE owner_id NOT LIKE '123456789012' AND start_time < NOW() - INTERVAL '30 days' AND region IN ($region) ORDER BY age_days DESC, volume_size DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "📊 Waste Category Breakdown",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 20
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "currencyUSD"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "visible",
+            "placement": "right"
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'Unused Elastic IPs' as waste_category, COUNT(*) * 3.65 as monthly_cost FROM aws_ec2_eips WHERE instance_id IS NULL AND network_interface_id IS NULL AND region IN ($region) UNION ALL SELECT 'Orphaned EBS Volumes' as waste_category, SUM(size) * 0.10 as monthly_cost FROM aws_ec2_ebs_volumes WHERE state = 'available' AND region IN ($region) UNION ALL SELECT 'Stopped Instances' as waste_category, COUNT(*) * 50 as monthly_cost FROM aws_ec2_instances WHERE state->>'Name' = 'stopped' AND region IN ($region) UNION ALL SELECT 'Old Snapshots' as waste_category, SUM(volume_size) * 0.05 * (EXTRACT(DAY FROM NOW() - start_time) / 30.0) as monthly_cost FROM aws_ec2_ebs_snapshots WHERE owner_id NOT LIKE '123456789012' AND start_time < NOW() - INTERVAL '90 days' AND region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "📈 Cleanup Opportunities by Region",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 20
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "currencyUSD"
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "barWidth": 0.97,
+          "groupWidth": 0.7,
+          "legend": {
+            "displayMode": "visible",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT region, SUM(waste_amount) as total_waste FROM ( SELECT region, COUNT(*) * 3.65 as waste_amount FROM aws_ec2_eips WHERE instance_id IS NULL AND network_interface_id IS NULL GROUP BY region UNION ALL SELECT region, SUM(size) * 0.10 as waste_amount FROM aws_ec2_ebs_volumes WHERE state = 'available' GROUP BY region UNION ALL SELECT region, COUNT(*) * 50 as waste_amount FROM aws_ec2_instances WHERE state->>'Name' = 'stopped' GROUP BY region ) regional_waste WHERE region IN ($region) GROUP BY region ORDER BY total_waste DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "⚠️ Stopped Instances Still Incurring Costs",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 20
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 7},
+                {"color": "red", "value": 30}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "estimated_monthly_ebs_cost"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currencyUSD"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT instance_id, instance_type, region, state->>'Name' as state, EXTRACT(DAY FROM NOW() - state_transition_reason_time) as days_stopped, COALESCE(tags->>'Name', instance_id) as instance_name, COALESCE(tags->>'Environment', 'Unknown') as environment, CASE WHEN instance_type LIKE 't%.micro' THEN 8 WHEN instance_type LIKE 't%.small' THEN 16 WHEN instance_type LIKE 't%.medium' THEN 32 ELSE 50 END as estimated_monthly_ebs_cost FROM aws_ec2_instances WHERE state->>'Name' = 'stopped' AND region IN ($region) AND account_id IN ($account) ORDER BY days_stopped DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      }
+    ],
+    "refresh": "5m",
+    "schemaVersion": 36,
+    "version": 1,
+    "links": []
+}

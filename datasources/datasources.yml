@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: CloudInventoryDB
+    type: postgres
+    url: postgres
+    database: cloudquery
+    user: grafana
+    secureJsonData:
+      password: password
+    jsonData:
+      sslmode: disable
+    isDefault: true
+    version: 1
+    editable: true

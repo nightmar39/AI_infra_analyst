@@ -1,0 +1,290 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 19,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "\n-- Test the simple compute summary\nSELECT \n    cloud_provider,\n    COUNT(*) as total_instances,\n    COUNT(*) FILTER (WHERE instance_status IN ('running', 'RUNNING', 'Succeeded')) as running_instances,\n    COUNT(*) FILTER (WHERE instance_status IN ('stopped', 'STOPPED', 'Stopped')) as stopped_instances,\n    COUNT(*) FILTER (WHERE compliance_tags = 'Compliant') as compliant_instances,\n    ROUND(\n        (COUNT(*) FILTER (WHERE compliance_tags = 'Compliant')::decimal / COUNT(*)::decimal) * 100, \n        1\n    ) as compliance_percentage,\n    ROUND(\n        (COUNT(*) FILTER (WHERE instance_status IN ('running', 'RUNNING', 'Succeeded'))::decimal / COUNT(*)::decimal) * 100, \n        1\n    ) as utilization_percentage\nFROM (\n    -- AWS EC2 Instances\n    SELECT \n        'AWS' as cloud_provider,\n        state->>'Name' as instance_status,\n        CASE \n            WHEN tags ? 'Name' AND tags ? 'Environment' AND tags ? 'Project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags\n    FROM aws_ec2_instances\n    WHERE state->>'Name' != 'terminated'\n    \n    UNION ALL\n    \n    -- GCP Compute Engine Instances\n    SELECT \n        'GCP' as cloud_provider,\n        status as instance_status,\n        CASE \n            WHEN labels ? 'environment' AND labels ? 'project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags\n    FROM gcp_compute_instances\n    \n    UNION ALL\n    \n    -- Azure Virtual Machines\n    SELECT \n        'Azure' as cloud_provider,\n        COALESCE(properties->>'provisioningState', 'Unknown') as instance_status,\n        CASE \n            WHEN tags ? 'Environment' AND tags ? 'Project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags\n    FROM azure_compute_virtual_machines\n) compute_summary\nGROUP BY cloud_provider\nORDER BY total_instances DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Multi Cloud Compute Summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Multi-Cloud Storage Summary Dashboard\n-- Executive overview of storage security, compliance, and cost optimization\n\nSELECT \n    cloud_provider,\n    COUNT(*) as total_storage_resources,\n    COUNT(*) FILTER (WHERE security_risk LIKE 'HIGH%') as high_security_risk,\n    COUNT(*) FILTER (WHERE security_risk LIKE 'MEDIUM%') as medium_security_risk,\n    COUNT(*) FILTER (WHERE compliance_tags = 'Non-Compliant') as non_compliant,\n    COUNT(*) FILTER (WHERE cost_optimization LIKE 'Review%') as needs_cost_review,\n    ROUND(\n        (COUNT(*) FILTER (WHERE compliance_tags = 'Compliant')::decimal / COUNT(*)::decimal) * 100, \n        1\n    ) as compliance_percentage,\n    ROUND(\n        (COUNT(*) FILTER (WHERE security_risk LIKE 'HIGH%')::decimal / COUNT(*)::decimal) * 100, \n        1\n    ) as high_risk_percentage\nFROM (\n    -- AWS S3 Buckets\n    SELECT \n        'AWS' as cloud_provider,\n        CASE \n            WHEN policy_status->>'isPublic' = 'true'\n            THEN 'HIGH - Public Access'\n            WHEN policy_status IS NOT NULL AND policy_status != '{}'\n            THEN 'MEDIUM - Has Policy'\n            ELSE 'Low - Private'\n        END as security_risk,\n        CASE \n            WHEN tags ? 'Environment' AND tags ? 'Project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags,\n        CASE \n            WHEN name LIKE '%temp%' OR name LIKE '%test%' OR name LIKE '%demo%'\n            THEN 'Review - Temporary bucket'\n            WHEN creation_date < NOW() - INTERVAL '1 year'\n            THEN 'Review - Old bucket (>1 year)'\n            ELSE 'Active'\n        END as cost_optimization\n    FROM aws_s3_buckets\n    \n    UNION ALL\n    \n    -- GCP Cloud Storage Buckets\n    SELECT \n        'GCP' as cloud_provider,\n        CASE \n            WHEN uniform_bucket_level_access->>'enabled' = 'false'\n            THEN 'MEDIUM - Legacy ACLs enabled'\n            ELSE 'Low - Uniform access'\n        END as security_risk,\n        CASE \n            WHEN labels ? 'environment' AND labels ? 'project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags,\n        CASE \n            WHEN name LIKE '%temp%' OR name LIKE '%test%' OR name LIKE '%staging%'\n            THEN 'Review - Temporary bucket'\n            WHEN storage_class = 'ARCHIVE'\n            THEN 'Optimized - Archive storage'\n            WHEN storage_class = 'COLDLINE'\n            THEN 'Optimized - Cold storage'\n            ELSE 'Standard - Review usage'\n        END as cost_optimization\n    FROM gcp_storage_buckets\n    \n    UNION ALL\n    \n    -- Azure Storage Accounts\n    SELECT \n        'Azure' as cloud_provider,\n        CASE \n            WHEN properties->>'allowBlobPublicAccess' = 'true'\n            THEN 'HIGH - Public blob access'\n            WHEN properties->>'supportsHttpsTrafficOnly' = 'false'\n            THEN 'MEDIUM - HTTP allowed'\n            ELSE 'Low - Secure configuration'\n        END as security_risk,\n        CASE \n            WHEN tags ? 'Environment' AND tags ? 'Project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags,\n        CASE \n            WHEN name LIKE '%test%' OR name LIKE '%temp%' OR name LIKE '%cache%'\n            THEN 'Review - Temporary storage'\n            WHEN sku->>'name' LIKE '%RAGRS%'\n            THEN 'Review - High redundancy cost'\n            WHEN sku->>'name' LIKE '%LRS%'\n            THEN 'Optimized - Local redundancy'\n            ELSE 'Standard'\n        END as cost_optimization\n    FROM azure_storage_accounts\n) storage_summary\nGROUP BY cloud_provider\nORDER BY cloud_provider;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Multi-cloud Storage Summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "CloudInventoryDB",
+        "uid": "beu42bv936pz4d"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 19,
+        "w": 14,
+        "x": 0,
+        "y": 13
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.2.0-16636675413",
+      "targets": [
+        {
+          "datasource": {
+            "type": "CloudInventoryDB",
+            "uid": "beu42bv936pz4d"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Working Unified Multi-Cloud Compute Asset Inventory\n-- Tested and validated against your PostgreSQL database\n\nSELECT \n    cloud_provider,\n    resource_type,\n    resource_name,\n    resource_id,\n    instance_size,\n    instance_status,\n    region_zone,\n    public_ip,\n    private_ip,\n    created_date,\n    environment,\n    project_team,\n    compliance_tags\nFROM (\n    -- AWS EC2 Instances\n    SELECT \n        'AWS' as cloud_provider,\n        'EC2 Instance' as resource_type,\n        COALESCE(tags->>'Name', 'Unnamed') as resource_name,\n        instance_id as resource_id,\n        instance_type as instance_size,\n        state->>'Name' as instance_status,\n        region as region_zone,\n        COALESCE(public_ip_address, 'None') as public_ip,\n        COALESCE(private_ip_address, 'Unknown') as private_ip,\n        launch_time as created_date,\n        COALESCE(tags->>'Environment', 'Untagged') as environment,\n        COALESCE(tags->>'Project', tags->>'Team', 'Unknown') as project_team,\n        CASE \n            WHEN tags ? 'Name' AND tags ? 'Environment' AND tags ? 'Project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags\n    FROM aws_ec2_instances\n    WHERE state->>'Name' != 'terminated'\n    \n    UNION ALL\n    \n    -- GCP Compute Engine Instances\n    SELECT \n        'GCP' as cloud_provider,\n        'Compute Engine' as resource_type,\n        COALESCE(labels->>'name', name, 'Unnamed') as resource_name,\n        name as resource_id,\n        CASE \n            WHEN machine_type LIKE '%e2-micro%' THEN 'e2-micro'\n            WHEN machine_type LIKE '%e2-small%' THEN 'e2-small'\n            WHEN machine_type LIKE '%e2-medium%' THEN 'e2-medium'\n            WHEN machine_type LIKE '%n1-standard%' THEN 'n1-standard'\n            WHEN machine_type LIKE '%n2-standard%' THEN 'n2-standard'\n            WHEN machine_type LIKE '%n1-highmem%' THEN 'n1-highmem'\n            WHEN machine_type LIKE '%c2-standard%' THEN 'c2-standard'\n            ELSE 'Other'\n        END as instance_size,\n        status as instance_status,\n        CASE \n            WHEN zone LIKE '%us-central1%' THEN 'us-central1'\n            WHEN zone LIKE '%us-east1%' THEN 'us-east1'\n            WHEN zone LIKE '%europe-west1%' THEN 'europe-west1'\n            WHEN zone LIKE '%us-west1%' THEN 'us-west1'\n            ELSE 'Other Zone'\n        END as region_zone,\n        COALESCE(\n            network_interfaces->0->'accessConfigs'->0->>'natIP',\n            'None'\n        ) as public_ip,\n        COALESCE(\n            network_interfaces->0->>'networkIP',\n            'Unknown'\n        ) as private_ip,\n        creation_timestamp::timestamp as created_date,\n        COALESCE(labels->>'environment', 'Untagged') as environment,\n        COALESCE(labels->>'project', labels->>'team', 'Unknown') as project_team,\n        CASE \n            WHEN labels ? 'environment' AND labels ? 'project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags\n    FROM gcp_compute_instances\n    \n    UNION ALL\n    \n    -- Azure Virtual Machines\n    SELECT \n        'Azure' as cloud_provider,\n        'Virtual Machine' as resource_type,\n        COALESCE(tags->>'Name', name, 'Unnamed') as resource_name,\n        name as resource_id,\n        COALESCE(\n            properties->'hardwareProfile'->>'vmSize',\n            'Unknown'\n        ) as instance_size,\n        COALESCE(\n            properties->>'provisioningState',\n            'Unknown'\n        ) as instance_status,\n        location as region_zone,\n        'Check Network Interface' as public_ip,\n        'Check Network Interface' as private_ip,\n        NULL as created_date,\n        COALESCE(tags->>'Environment', 'Untagged') as environment,\n        COALESCE(tags->>'Project', tags->>'Team', 'Unknown') as project_team,\n        CASE \n            WHEN tags ? 'Environment' AND tags ? 'Project' \n            THEN 'Compliant'\n            ELSE 'Non-Compliant'\n        END as compliance_tags\n    FROM azure_compute_virtual_machines\n) unified_inventory\nORDER BY \n    cloud_provider,\n    CASE instance_status \n        WHEN 'running' THEN 1 \n        WHEN 'RUNNING' THEN 1\n        WHEN 'Succeeded' THEN 1\n        WHEN 'stopped' THEN 2\n        WHEN 'STOPPED' THEN 2\n        WHEN 'Stopped' THEN 2\n        ELSE 3 \n    END,\n    resource_name;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "MultiCloud Compute instances",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MultiCloud Assets",
+  "uid": "d06f6483-ad60-42dc-982a-cf73325f4578",
+  "version": 5
+}

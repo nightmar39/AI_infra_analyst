@@ -1,0 +1,38 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp/postgres",
+        "$POSTGRES_URL"
+      ],
+      "env": {
+        "POSTGRES_URL": "postgresql://grafana:password@host.docker.internal:5432/cloudquery"
+      }
+    },
+    "grafana": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--network monitoring",
+        "-e",
+        "GRAFANA_URL",
+        "-e",
+        "GRAFANA_API_KEY",
+        "mcp/grafana",
+        "-t",
+        "stdio",
+        "-debug"
+      ],
+      "env": {
+        "GRAFANA_URL": "http://localhost:3000",  
+        "GRAFANA_API_KEY": "<API_KEY>"
+      }
+  }
+}
+}

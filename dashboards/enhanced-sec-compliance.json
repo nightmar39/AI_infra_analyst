@@ -1,0 +1,678 @@
+{
+    "id": null,
+    "title": "Enhanced Security & Compliance Dashboard",
+    "tags": ["security", "compliance", "iam", "advanced", "governance"],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "hideControls": false,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "timepicker": {
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "account",
+          "type": "query",
+          "query": "SELECT DISTINCT account_id FROM aws_iam_policies ORDER BY account_id",
+          "datasource": "CloudInventoryDB",
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          }
+        },
+        {
+          "name": "severity",
+          "type": "custom",
+          "options": [
+            {"text": "All", "value": "$__all", "selected": true},
+            {"text": "Critical", "value": "Critical"},
+            {"text": "High", "value": "High"},
+            {"text": "Medium", "value": "Medium"},
+            {"text": "Low", "value": "Low"}
+          ],
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚨 Critical Security Alerts",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'Admin Policies' as metric, COUNT(*) as value FROM aws_iam_policies WHERE is_attachable = true AND policy_name LIKE '%Admin%' AND account_id IN ($account) UNION ALL SELECT 'Unencrypted RDS' as metric, COUNT(*) as value FROM aws_rds_instances WHERE storage_encrypted = false AND db_instance_status = 'available' AND account_id IN ($account) UNION ALL SELECT 'Open Security Groups' as metric, COUNT(*) as value FROM aws_ec2_security_groups WHERE ip_permissions::text LIKE '%0.0.0.0/0%' AND account_id IN ($account) UNION ALL SELECT 'Users Without MFA' as metric, COUNT(u.*) as value FROM aws_iam_users u LEFT JOIN aws_iam_mfa_devices m ON u.user_name = m.user_name WHERE m.user_name IS NULL AND u.account_id IN ($account) UNION ALL SELECT 'Public S3 Buckets' as metric, COUNT(*) as value FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE pab.public_access_block_configuration IS NULL AND b.account_id IN ($account)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "🔐 IAM Policy Risk Analysis",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "visible",
+            "placement": "right"
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT CASE WHEN policy_name LIKE '%Admin%' OR policy_name LIKE '%FullAccess%' THEN 'High Risk (Admin/Full)' WHEN policy_name LIKE '%ReadOnly%' THEN 'Low Risk (ReadOnly)' WHEN attachment_count = 0 THEN 'Unused Policies' WHEN attachment_count > 10 THEN 'Widely Used' ELSE 'Standard Policies' END as risk_category, COUNT(*) as policy_count FROM aws_iam_policies WHERE is_attachable = true AND account_id IN ($account) GROUP BY CASE WHEN policy_name LIKE '%Admin%' OR policy_name LIKE '%FullAccess%' THEN 'High Risk (Admin/Full)' WHEN policy_name LIKE '%ReadOnly%' THEN 'Low Risk (ReadOnly)' WHEN attachment_count = 0 THEN 'Unused Policies' WHEN attachment_count > 10 THEN 'Widely Used' ELSE 'Standard Policies' END",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "👥 IAM User Security Status",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 8,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'Total Users' as metric, COUNT(*) as count FROM aws_iam_users WHERE account_id IN ($account) UNION ALL SELECT 'Users with Console Access' as metric, COUNT(*) as count FROM aws_iam_users WHERE password_last_used IS NOT NULL AND account_id IN ($account) UNION ALL SELECT 'Users Never Logged In' as metric, COUNT(*) as count FROM aws_iam_users WHERE password_last_used IS NULL AND account_id IN ($account) UNION ALL SELECT 'Stale Users (>90 days)' as metric, COUNT(*) as count FROM aws_iam_users WHERE password_last_used < NOW() - INTERVAL '90 days' AND account_id IN ($account)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "🔑 IAM Role Analysis",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 16,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'Total IAM Roles' as metric, COUNT(*) as count FROM aws_iam_roles WHERE account_id IN ($account) UNION ALL SELECT 'Service Roles' as metric, COUNT(*) as count FROM aws_iam_roles WHERE assume_role_policy_document::text LIKE '%service%' AND account_id IN ($account) UNION ALL SELECT 'Cross-Account Roles' as metric, COUNT(*) as count FROM aws_iam_roles WHERE assume_role_policy_document::text LIKE '%:root%' AND account_id IN ($account) UNION ALL SELECT 'Recently Created (<30d)' as metric, COUNT(*) as count FROM aws_iam_roles WHERE create_date > NOW() - INTERVAL '30 days' AND account_id IN ($account)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "⚠️ High-Risk IAM Policies",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "risk_level"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"Critical": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"High": {"color": "orange", "index": 1}}, "type": "value"},
+                    {"options": {"Medium": {"color": "yellow", "index": 2}}, "type": "value"}
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "attachment_count"},
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "thresholds"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT policy_name, arn, attachment_count, create_date, CASE WHEN policy_name LIKE '%AdministratorAccess%' THEN 'Critical' WHEN policy_name LIKE '%Admin%' OR policy_name LIKE '%FullAccess%' THEN 'High' WHEN policy_name LIKE '%PowerUser%' THEN 'Medium' ELSE 'Low' END as risk_level, CASE WHEN policy_name LIKE '%AdministratorAccess%' THEN 'Full AWS Access - Highest Privilege' WHEN policy_name LIKE '%Admin%' THEN 'Administrative Access' WHEN policy_name LIKE '%FullAccess%' THEN 'Service Full Access' ELSE 'Review Required' END as risk_description FROM aws_iam_policies WHERE is_attachable = true AND (policy_name LIKE '%Admin%' OR policy_name LIKE '%FullAccess%' OR policy_name LIKE '%PowerUser%') AND account_id IN ($account) ORDER BY CASE WHEN policy_name LIKE '%AdministratorAccess%' THEN 1 WHEN policy_name LIKE '%Admin%' THEN 2 WHEN policy_name LIKE '%FullAccess%' THEN 3 ELSE 4 END, attachment_count DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "🔒 Security Group Violations",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "violation_severity"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"Critical": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"High": {"color": "orange", "index": 1}}, "type": "value"},
+                    {"options": {"Medium": {"color": "yellow", "index": 2}}, "type": "value"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT DISTINCT sg.group_id, sg.group_name, sg.region, sg.vpc_id, rule->>'IpProtocol' as protocol, rule->>'FromPort' as from_port, rule->>'ToPort' as to_port, CASE WHEN rule->>'IpRanges'->0->>'CidrIp' = '0.0.0.0/0' AND (rule->>'FromPort' = '22' OR rule->>'FromPort' = '3389') THEN 'Critical' WHEN rule->>'IpRanges'->0->>'CidrIp' = '0.0.0.0/0' AND rule->>'FromPort' != rule->>'ToPort' THEN 'High' WHEN rule->>'IpRanges'->0->>'CidrIp' = '0.0.0.0/0' THEN 'Medium' ELSE 'Low' END as violation_severity, CASE WHEN rule->>'IpRanges'->0->>'CidrIp' = '0.0.0.0/0' AND (rule->>'FromPort' = '22' OR rule->>'FromPort' = '3389') THEN 'SSH/RDP Open to Internet' WHEN rule->>'IpRanges'->0->>'CidrIp' = '0.0.0.0/0' THEN 'Open to Internet' ELSE 'Permissive Rule' END as violation_type FROM aws_ec2_security_groups sg, jsonb_array_elements(sg.ip_permissions) as rule WHERE (rule->>'IpRanges'->0->>'CidrIp' = '0.0.0.0/0' OR rule->>'IpRanges'->0->>'CidrIp' = '::/0') AND sg.account_id IN ($account) ORDER BY violation_severity, sg.group_name",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "👤 IAM Users Without MFA",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 30},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "days_since_login"},
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "thresholds"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "risk_level"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"High": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"Medium": {"color": "yellow", "index": 1}}, "type": "value"},
+                    {"options": {"Low": {"color": "green", "index": 2}}, "type": "value"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT u.user_name, u.create_date, u.password_last_used, CASE WHEN u.password_last_used IS NULL THEN 'Never' ELSE EXTRACT(DAY FROM NOW() - u.password_last_used)::text || ' days' END as days_since_login, CASE WHEN u.password_last_used IS NULL THEN 'High' WHEN u.password_last_used < NOW() - INTERVAL '90 days' THEN 'High' WHEN u.password_last_used < NOW() - INTERVAL '30 days' THEN 'Medium' ELSE 'Low' END as risk_level, CASE WHEN u.password_last_used IS NULL THEN 'Never logged in - Consider deletion' WHEN u.password_last_used < NOW() - INTERVAL '90 days' THEN 'Stale account - Review access' ELSE 'Active user - Enable MFA' END as recommendation FROM aws_iam_users u LEFT JOIN aws_iam_mfa_devices m ON u.user_name = m.user_name WHERE m.user_name IS NULL AND u.account_id IN ($account) ORDER BY CASE WHEN u.password_last_used IS NULL THEN 1 WHEN u.password_last_used < NOW() - INTERVAL '90 days' THEN 2 ELSE 3 END, u.password_last_used DESC NULLS FIRST",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "🗂️ Unused IAM Policies",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 90},
+                {"color": "red", "value": 180}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "age_days"},
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "thresholds"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT policy_name, arn, create_date, EXTRACT(DAY FROM NOW() - create_date) as age_days, attachment_count, CASE WHEN EXTRACT(DAY FROM NOW() - create_date) > 180 AND attachment_count = 0 THEN 'Delete - Old & Unused' WHEN EXTRACT(DAY FROM NOW() - create_date) > 90 AND attachment_count = 0 THEN 'Review for Deletion' WHEN attachment_count = 0 THEN 'Monitor Usage' ELSE 'Keep' END as recommendation FROM aws_iam_policies WHERE is_attachable = true AND attachment_count = 0 AND policy_name NOT LIKE 'AWS%' AND account_id IN ($account) ORDER BY age_days DESC, policy_name",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "📊 Security Compliance Score",
+        "type": "gauge",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 24
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 60},
+                {"color": "green", "value": 80}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "displayMode": "basic"
+        },
+        "targets": [
+          {
+            "rawSql": "WITH security_metrics AS ( SELECT 100 - ( (SELECT COUNT(*) FROM aws_rds_instances WHERE storage_encrypted = false AND db_instance_status = 'available' AND account_id IN ($account)) * 20 + (SELECT COUNT(*) FROM aws_ec2_security_groups WHERE ip_permissions::text LIKE '%0.0.0.0/0%' AND account_id IN ($account)) * 15 + (SELECT COUNT(u.*) FROM aws_iam_users u LEFT JOIN aws_iam_mfa_devices m ON u.user_name = m.user_name WHERE m.user_name IS NULL AND u.account_id IN ($account)) * 10 + (SELECT COUNT(*) FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE pab.public_access_block_configuration IS NULL AND b.account_id IN ($account)) * 25 ) as compliance_score ) SELECT GREATEST(0, LEAST(100, compliance_score)) as overall_security_score FROM security_metrics",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "🎯 Top Security Remediation Actions",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 24
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "priority"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"Critical": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"High": {"color": "orange", "index": 1}}, "type": "value"},
+                    {"options": {"Medium": {"color": "yellow", "index": 2}}, "type": "value"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'Enable RDS Encryption' as action, COUNT(*) as affected_resources, 'Critical' as priority, 'Encrypt ' || COUNT(*) || ' unencrypted RDS instances' as description FROM aws_rds_instances WHERE storage_encrypted = false AND db_instance_status = 'available' AND account_id IN ($account) HAVING COUNT(*) > 0 UNION ALL SELECT 'Fix Security Groups' as action, COUNT(*) as affected_resources, 'Critical' as priority, 'Restrict ' || COUNT(*) || ' overly permissive security groups' as description FROM aws_ec2_security_groups WHERE ip_permissions::text LIKE '%0.0.0.0/0%' AND account_id IN ($account) HAVING COUNT(*) > 0 UNION ALL SELECT 'Enable S3 Block Public Access' as action, COUNT(*) as affected_resources, 'High' as priority, 'Protect ' || COUNT(*) || ' potentially public S3 buckets' as description FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE pab.public_access_block_configuration IS NULL AND b.account_id IN ($account) HAVING COUNT(*) > 0 UNION ALL SELECT 'Enable MFA for Users' as action, COUNT(u.*) as affected_resources, 'High' as priority, 'Enable MFA for ' || COUNT(u.*) || ' users without MFA' as description FROM aws_iam_users u LEFT JOIN aws_iam_mfa_devices m ON u.user_name = m.user_name WHERE m.user_name IS NULL AND u.account_id IN ($account) HAVING COUNT(u.*) > 0 UNION ALL SELECT 'Review Admin Policies' as action, COUNT(*) as affected_resources, 'Medium' as priority, 'Review ' || COUNT(*) || ' high-privilege policies' as description FROM aws_iam_policies WHERE is_attachable = true AND (policy_name LIKE '%Admin%' OR policy_name LIKE '%FullAccess%') AND account_id IN ($account) HAVING COUNT(*) > 0 ORDER BY CASE priority WHEN 'Critical' THEN 1 WHEN 'High' THEN 2 WHEN 'Medium' THEN 3 ELSE 4 END, affected_resources DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "📈 Security Trends",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 24
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {
+                "mode": "none",
+                "group": "A"
+              },
+              "axisPlacement": "auto",
+              "axisLabel": "",
+              "axisColorMode": "text",
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "axisCenteredZero": false,
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "visible",
+            "placement": "bottom",
+            "calcs": []
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT DATE_TRUNC('week', create_date) as time, 'IAM Users Created' as metric, COUNT(*) as value FROM aws_iam_users WHERE create_date > NOW() - INTERVAL '90 days' AND account_id IN ($account) GROUP BY DATE_TRUNC('week', create_date) UNION ALL SELECT DATE_TRUNC('week', create_date) as time, 'IAM Roles Created' as metric, COUNT(*) as value FROM aws_iam_roles WHERE create_date > NOW() - INTERVAL '90 days' AND account_id IN ($account) GROUP BY DATE_TRUNC('week', create_date) UNION ALL SELECT DATE_TRUNC('week', create_date) as time, 'IAM Policies Created' as metric, COUNT(*) as value FROM aws_iam_policies WHERE create_date > NOW() - INTERVAL '90 days' AND is_attachable = true AND account_id IN ($account) GROUP BY DATE_TRUNC('week', create_date) ORDER BY time, metric",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      }
+    ],
+    "refresh": "5m",
+    "schemaVersion": 36,
+    "version": 1,
+    "links": []
+  }

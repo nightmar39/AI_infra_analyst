@@ -1,0 +1,422 @@
+{
+    "id": null,
+    "title": "Security & Compliance Dashboard",
+    "tags": ["security", "compliance", "rds", "s3", "efs"],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "hideControls": false,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "timepicker": {
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "region",
+          "type": "query",
+          "query": "SELECT DISTINCT region FROM aws_rds_instances ORDER BY region",
+          "datasource": "CloudInventoryDB",
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚨 Critical Security Issues",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'Unencrypted RDS' as metric, COUNT(*) as value FROM aws_rds_instances WHERE storage_encrypted = false AND db_instance_status = 'available' AND region IN ($region) UNION ALL SELECT 'Public+Unencrypted RDS' as metric, COUNT(*) as value FROM aws_rds_instances WHERE storage_encrypted = false AND publicly_accessible = true AND db_instance_status = 'available' AND region IN ($region) UNION ALL SELECT 'Unprotected S3 Buckets' as metric, COUNT(*) as value FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE pab.public_access_block_configuration IS NULL AND b.region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "🔐 RDS Encryption Status",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "visible",
+            "placement": "bottom"
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT CASE WHEN storage_encrypted = true THEN 'Encrypted' ELSE 'Unencrypted' END as encryption_status, COUNT(*) as count FROM aws_rds_instances WHERE db_instance_status = 'available' AND region IN ($region) GROUP BY storage_encrypted",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "🗄️ Total EFS Storage (GB)",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 8,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 10000}
+              ]
+            },
+            "unit": "bytes"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT SUM(CASE WHEN size_in_bytes->>'Value' IS NOT NULL THEN CAST(size_in_bytes->>'Value' AS BIGINT) ELSE 0 END) as total_storage_bytes FROM aws_efs_filesystems WHERE life_cycle_state = 'available' AND region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "🌐 S3 Public Access Risk",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 16,
+          "y": 4
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT COUNT(*) as unprotected_buckets FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE pab.public_access_block_configuration IS NULL AND b.region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "🚨 Unencrypted RDS Instances",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0},
+                {"color": "red", "value": 1}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "risk_level"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"Critical Risk": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"High Risk": {"color": "yellow", "index": 1}}, "type": "value"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT db_instance_identifier, engine, engine_version, region, storage_encrypted, allocated_storage, publicly_accessible, COALESCE(tags->>'Name', db_instance_identifier) as instance_name, CASE WHEN publicly_accessible = true AND storage_encrypted = false THEN 'Critical Risk' WHEN storage_encrypted = false THEN 'High Risk' ELSE 'Compliant' END as risk_level FROM aws_rds_instances WHERE storage_encrypted = false AND db_instance_status = 'available' AND region IN ($region) ORDER BY allocated_storage DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "📊 EFS Storage by Region",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "decbytes"
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "barWidth": 0.97,
+          "groupWidth": 0.7,
+          "legend": {
+            "displayMode": "visible",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT region, SUM(CASE WHEN size_in_bytes->>'Value' IS NOT NULL THEN CAST(size_in_bytes->>'Value' AS BIGINT) ELSE 0 END) as total_storage_bytes FROM aws_efs_filesystems WHERE life_cycle_state = 'available' AND region IN ($region) GROUP BY region ORDER BY total_storage_bytes DESC",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "🛡️ S3 Bucket Security Status",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "protection_status"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {"options": {"No Public Access Block": {"color": "red", "index": 0}}, "type": "value"},
+                    {"options": {"Has Protection": {"color": "green", "index": 1}}, "type": "value"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "footer": {
+            "show": false,
+            "reducer": ["sum"],
+            "countRows": false
+          }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT b.name as bucket_name, b.region, CASE WHEN pab.public_access_block_configuration IS NOT NULL THEN 'Has Protection' ELSE 'No Public Access Block' END as protection_status, COALESCE(b.tags->>'Name', b.name) as display_name, COALESCE(b.tags->>'Environment', 'Unknown') as environment FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE b.region IN ($region) ORDER BY protection_status, b.name",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "📈 Security Compliance Summary",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "text": {},
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT 'RDS Encryption' as metric, ROUND(COUNT(CASE WHEN storage_encrypted = true THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 1) as compliance_percent FROM aws_rds_instances WHERE db_instance_status = 'available' AND region IN ($region) UNION ALL SELECT 'EFS Encryption' as metric, ROUND(COUNT(CASE WHEN encrypted = true THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 1) as compliance_percent FROM aws_efs_filesystems WHERE life_cycle_state = 'available' AND region IN ($region) UNION ALL SELECT 'S3 Protection' as metric, ROUND((COUNT(b.*) - COUNT(CASE WHEN pab.public_access_block_configuration IS NULL THEN 1 END)) * 100.0 / NULLIF(COUNT(b.*), 0), 1) as compliance_percent FROM aws_s3_buckets b LEFT JOIN aws_s3_bucket_public_access_blocks pab ON b.name = pab.bucket_arn WHERE b.region IN ($region)",
+            "format": "table",
+            "datasource": "CloudInventoryDB"
+          }
+        ]
+      }
+    ],
+    "refresh": "5m",
+    "schemaVersion": 36,
+    "version": 1,
+    "links": []
+  }
